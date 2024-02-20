@@ -8,6 +8,7 @@ sista::Field* field;
 sista::Border* border;
 std::vector<SandWorm*> sandWorms;
 sista::Pawn* miner;
+bool finished = false;
 
 
 int main() {
@@ -69,8 +70,8 @@ int main() {
     field->addPrintPawn(miner);
 
     // Main loop
-    bool finished = false, won = false;
-    std::thread th = std::thread([&finished, &won]() {
+    bool won = false, alarm = false;
+    std::thread th = std::thread([&won]() {
         while (true) {
             #if defined(_WIN32) or defined(__linux__)
                 char input = getch();
@@ -98,35 +99,41 @@ int main() {
             sandWorm->move();
         }
         std::cout << std::flush;
-        // Check if there's any sand worm in the INTERNAL_WIDTH x INTERNAL_HEIGHT area
-        for (SandWorm* sandWorm : sandWorms) {
-            sista::Coordinates head_coords = sandWorm->head->getCoordinates();
-            if ( // Check if the head is inside the safe area
-                head_coords.x >= (WIDTH - INTERNAL_WIDTH) / 2 &&
-                head_coords.x < (WIDTH + INTERNAL_WIDTH) / 2 &&
-                head_coords.y >= (HEIGHT - INTERNAL_HEIGHT) / 2 &&
-                head_coords.y < (HEIGHT + INTERNAL_HEIGHT) / 2
-            ) {
-                // Worms are now able to hear the sound of the mining
-                cursor.set(sista::Coordinates(HEIGHT + 3, WIDTH / 3));
-                ANSI::setForegroundColor(ANSI::ForegroundColor::F_RED);
-                std::cout << "The sand worms are coming!\n";
-                std::cout << "You have three seconds to run away! [Q]\n";
-                for (int i = 6; i > 0; i--) {
-                    cursor.set(sista::Coordinates(HEIGHT + 4, WIDTH / 3 + 40));
-                    std::cout << i << std::flush;
-                    // Move the sand worms
-                    for (SandWorm* sandWorm : sandWorms) {
-                        sandWorm->move();
+        if (!alarm) { // Unless the alarm was already triggered
+            // Check if there's any sand worm in the INTERNAL_WIDTH x INTERNAL_HEIGHT area
+            for (SandWorm* sandWorm : sandWorms) {
+                sista::Coordinates head_coords = sandWorm->head->getCoordinates();
+                if ( // Check if the head is inside the safe area
+                    head_coords.x >= (WIDTH - INTERNAL_WIDTH) / 2 &&
+                    head_coords.x < (WIDTH + INTERNAL_WIDTH) / 2 &&
+                    head_coords.y >= (HEIGHT - INTERNAL_HEIGHT) / 2 &&
+                    head_coords.y < (HEIGHT + INTERNAL_HEIGHT) / 2
+                ) {
+                    // Worms are now able to hear the sound of the mining
+                    cursor.set(sista::Coordinates(HEIGHT + 3, WIDTH / 4));
+                    ANSI::setForegroundColor(ANSI::ForegroundColor::F_RED);
+                    std::cout << "The sand worms are coming!\n";
+                    cursor.set(sista::Coordinates(HEIGHT + 4, WIDTH / 4 - 2));
+                    std::cout << "You must be ready to run away! [Q]\n";
+                    while (true) {
+                        // Move the sand worms
+                        for (SandWorm* sandWorm : sandWorms) {
+                            sandWorm->move();
+                            if (finished) {
+                                break;
+                            }
+                        }
+                        if (finished) {
+                            break;
+                        }
+                        std::cout << std::flush;
+                        std::this_thread::sleep_for(std::chrono::milliseconds(500));
                     }
-                    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                    finished = true;
+                    break;
                 }
-                finished = true;
-                won = false;
-                goto end;
             }
         }
-        end:
         // Wait a bit
         if (finished) {
             break;
@@ -203,20 +210,35 @@ void SandWorm::move() {
     int trials = 7;
     int direction;
     do {
+        sista::Pawn* pawn = field->getPawn(new_head_coords);
+        if (pawn != nullptr) {
+            if (pawn == miner) {
+                finished = true;
+                return;
+            }
+        }
         new_head_coords = old_head_coords;
         direction = rand() % 4;
         switch (direction) {
             case 0: // Up
-                new_head_coords.y--;
+                if (new_head_coords.y > 0) {
+                    new_head_coords.y--;
+                }
                 break;
             case 1: // Right
-                new_head_coords.x++;
+                if (new_head_coords.x < WIDTH - 1) {
+                    new_head_coords.x++;
+                }
                 break;
             case 2: // Down
-                new_head_coords.y++;
+                if (new_head_coords.y < HEIGHT - 1) {
+                    new_head_coords.y++;
+                }
                 break;
             case 3: // Left
-                new_head_coords.x--;
+                if (new_head_coords.x > 0) {
+                    new_head_coords.x--;
+                }
                 break;
         }
         if (trials <= 0) {
