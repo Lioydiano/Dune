@@ -116,10 +116,10 @@ int main() {
             }
             // Check if the new position is inside the safe area
             if (
-                new_coords.x >= (WIDTH - INTERNAL_WIDTH) / 2 &&
-                new_coords.x < (WIDTH + INTERNAL_WIDTH) / 2 &&
-                new_coords.y >= (HEIGHT - INTERNAL_HEIGHT) / 2 &&
-                new_coords.y < (HEIGHT + INTERNAL_HEIGHT) / 2
+                new_coords.x >= (WIDTH - INTERNAL_WIDTH) / 2 + 1 &&
+                new_coords.x < (WIDTH + INTERNAL_WIDTH) / 2 - 1 &&
+                new_coords.y >= (HEIGHT - INTERNAL_HEIGHT) / 2 + 1 &&
+                new_coords.y < (HEIGHT + INTERNAL_HEIGHT) / 2 - 1
             ) {
                 field->movePawnFromTo(coords, new_coords);
             }
@@ -339,10 +339,10 @@ void SandWorm::move() {
 }
 void SandWorm::erase() {
     field->erasePawn(head);
-    delete head;
+    // delete head;
     for (sista::Pawn* pawn : body) {
         field->erasePawn(pawn);
-        delete pawn;
+        // delete pawn;
     }
 }
 ANSI::Settings SandWorm::sandWormBodyStyle = ANSI::Settings(
@@ -403,7 +403,6 @@ void Bullet::move() {
     bool free = field->isFree(new_coords);
     if (field->isOutOfBounds(new_coords)) {
         field->erasePawn(this);
-        delete this;
         return;
     }
     if (free) {
