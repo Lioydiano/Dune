@@ -89,18 +89,22 @@ int main() {
             if (input == 'i' || input == 'I') {
                 bullet = true;
                 bullet_direction = UP;
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 continue;
             } else if (input == 'l' || input == 'L') {
                 bullet = true;
                 bullet_direction = RIGHT;
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 continue;
             } else if (input == 'k' || input == 'K') {
                 bullet = true;
                 bullet_direction = DOWN;
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 continue;
             } else if (input == 'j' || input == 'J') {
                 bullet = true;
                 bullet_direction = LEFT;
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 continue;
             }
             sista::Coordinates coords = miner->getCoordinates();
@@ -133,12 +137,17 @@ int main() {
         counter++;
         cursor.set(sista::Coordinates(HEIGHT + 2, WIDTH / 3));
         std::cout << "Melange: " << counter << std::flush;
+        // A new sand worm may spawn
+        if (rand() % SAND_WORMS_SPAWN_RATE == 0) {
+            sandWorms.push_back(new SandWorm());
+        }
         // Check if all worms are dead
         if (sandWorms.size() == 0) {
             won = true;
             finished = true;
             break;
         }
+        #if BULLETS_WITHOUT_ALARM
         // Check if a bullet was shot
         if (bullet) {
             new Bullet(miner, bullet_direction);
@@ -148,6 +157,7 @@ int main() {
         for (Bullet* bullet : bullets) {
             bullet->move();
         }
+        #endif
         // Move the sand worms
         for (SandWorm* sandWorm : sandWorms) {
             sandWorm->move();
@@ -175,12 +185,27 @@ int main() {
                         counter++;
                         cursor.set(sista::Coordinates(HEIGHT + 2, WIDTH / 3));
                         std::cout << "Melange: " << counter << std::flush;
+                        // A new sand worm may spawn
+                        if (rand() % SAND_WORMS_SPAWN_RATE == 0) {
+                            sandWorms.push_back(new SandWorm());
+                        }
                         // Check if all worms are dead
                         if (sandWorms.size() == 0) {
                             won = true;
                             finished = true;
                             break;
                         }
+                        #if BULLETS_ON_ALARM
+                        // Check if a bullet was shot
+                        if (bullet) {
+                            new Bullet(miner, bullet_direction);
+                            bullet = false;
+                        }
+                        // Move the bullets
+                        for (Bullet* bullet : bullets) {
+                            bullet->move();
+                        }
+                        #endif
                         // Move the sand worms
                         for (SandWorm* sandWorm : sandWorms) {
                             sandWorm->move();
@@ -302,6 +327,14 @@ void SandWorm::move() {
                 break;
         }
         if (trials <= 0) {
+            // The worm is stuck
+            for (sista::Pawn* pawn : body) {
+                if (pawn != nullptr && rand() % 2 == 0) {
+                    field->erasePawn(pawn);
+                }
+                // delete pawn;
+            }
+            trials = 7;
             return;
         }
         trials--;
