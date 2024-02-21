@@ -14,7 +14,11 @@
 // Bullets
 #define BULLETS_ON_ALARM 1 // Can we shoot bullets when the alarm is on?
 #define BULLETS_WITHOUT_ALARM 1 // Can we shoot bullets when the alarm is off?
-
+// Time
+#define FRAME 500 // The time between frames [ms]
+#define COOLDOWN 10 // The cooldown of the controls [ms]
+// Dev
+#define DEBUG 0 // Debug mode
 
 class SandWorm {
 public:

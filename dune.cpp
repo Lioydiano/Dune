@@ -3,6 +3,10 @@
 #include <thread>
 #include <chrono>
 
+#if DEBUG
+    #include <fstream>
+    std::ofstream debug("debug.log");
+#endif
 
 sista::Field* field;
 sista::Border* border;
@@ -86,25 +90,23 @@ int main() {
             if (finished) {
                 return;
             }
+            // Prevent the miner from moving too fast or shooting too fast
+            std::this_thread::sleep_for(std::chrono::milliseconds(COOLDOWN));
             if (input == 'i' || input == 'I') {
                 bullet = true;
                 bullet_direction = UP;
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 continue;
             } else if (input == 'l' || input == 'L') {
                 bullet = true;
                 bullet_direction = RIGHT;
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 continue;
             } else if (input == 'k' || input == 'K') {
                 bullet = true;
                 bullet_direction = DOWN;
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 continue;
             } else if (input == 'j' || input == 'J') {
                 bullet = true;
                 bullet_direction = LEFT;
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 continue;
             }
             sista::Coordinates coords = miner->getCoordinates();
@@ -125,7 +127,9 @@ int main() {
                 new_coords.y >= (HEIGHT - INTERNAL_HEIGHT) / 2 + 1 &&
                 new_coords.y < (HEIGHT + INTERNAL_HEIGHT) / 2 - 1
             ) {
-                field->movePawnFromTo(coords, new_coords);
+                if (field->isFree(new_coords)) {
+                    field->movePawnFromTo(coords, new_coords);
+                }
             }
         }
         finished = true;
@@ -148,14 +152,28 @@ int main() {
             break;
         }
         #if BULLETS_WITHOUT_ALARM
+        // Move the bullets
+        for (std::vector<Bullet*>::iterator it = bullets.begin(); it != bullets.end(); it++) {
+            #if DEBUG
+            debug << "Moving bullet in " << (*it)->getCoordinates().y << ", " << (*it)->getCoordinates().x << std::endl;
+            #endif
+            if ((*it) != nullptr)
+                (*it)->move();
+        }
+        for (std::vector<Bullet*>::iterator it = bullets.begin(); it != bullets.end(); it++) {
+            if ((*it) == nullptr) {
+                bullets.erase(it);
+                it--;
+            }
+        }
         // Check if a bullet was shot
         if (bullet) {
-            new Bullet(miner, bullet_direction);
+            sista::Coordinates coords = miner->getCoordinates();
+            coords = coords + directionMap[bullet_direction];
+            if (field->isFree(coords)) {
+                new Bullet(miner, bullet_direction);
+            }
             bullet = false;
-        }
-        // Move the bullets
-        for (Bullet* bullet : bullets) {
-            bullet->move();
         }
         #endif
         // Move the sand worms
@@ -181,6 +199,7 @@ int main() {
                     std::cout << "You must be ready to run away! [Q]\n";
                     cursor.set(sista::Coordinates(HEIGHT + 5, WIDTH / 4 - 2));
                     std::cout << "Your weapons are now ineffective!\n";
+                    std::this_thread::sleep_for(std::chrono::milliseconds(FRAME));
                     while (true) {
                         counter++;
                         cursor.set(sista::Coordinates(HEIGHT + 2, WIDTH / 3));
@@ -196,14 +215,28 @@ int main() {
                             break;
                         }
                         #if BULLETS_ON_ALARM
+                        // Move the bullets
+                        for (std::vector<Bullet*>::iterator it = bullets.begin(); it != bullets.end(); it++) {
+                            #if DEBUG
+                            debug << "Moving bullet in " << (*it)->getCoordinates().y << ", " << (*it)->getCoordinates().x << std::endl;
+                            #endif
+                            if ((*it) != nullptr)
+                                (*it)->move();
+                        }
+                        for (std::vector<Bullet*>::iterator it = bullets.begin(); it != bullets.end(); it++) {
+                            if ((*it) == nullptr) {
+                                bullets.erase(it);
+                                it--;
+                            }
+                        }
                         // Check if a bullet was shot
                         if (bullet) {
-                            new Bullet(miner, bullet_direction);
+                            sista::Coordinates coords = miner->getCoordinates();
+                            coords = coords + directionMap[bullet_direction];
+                            if (field->isFree(coords)) {
+                                new Bullet(miner, bullet_direction);
+                            }
                             bullet = false;
-                        }
-                        // Move the bullets
-                        for (Bullet* bullet : bullets) {
-                            bullet->move();
                         }
                         #endif
                         // Move the sand worms
@@ -217,7 +250,7 @@ int main() {
                             break;
                         }
                         std::cout << std::flush;
-                        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                        std::this_thread::sleep_for(std::chrono::milliseconds(FRAME));
                     }
                     finished = true;
                     break;
@@ -228,7 +261,7 @@ int main() {
         if (finished) {
             break;
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        std::this_thread::sleep_for(std::chrono::milliseconds(FRAME));
     }
     if (won) {
         cursor.set(sista::Coordinates(HEIGHT / 2, WIDTH + 10));
@@ -330,12 +363,12 @@ void SandWorm::move() {
             // The worm is stuck
             for (sista::Pawn* pawn : body) {
                 if (pawn != nullptr && rand() % 2 == 0) {
+                    body.erase(std::find(body.begin(), body.end(), pawn));
                     field->erasePawn(pawn);
                 }
                 // delete pawn;
             }
             trials = 7;
-            return;
         }
         trials--;
     } while (
@@ -423,44 +456,89 @@ Bullet::Bullet(sista::Pawn* shooter, Direction direction_) : sista::Pawn('^', si
     bool free = field->isFree(coords);
     if (free) {
         field->addPrintPawn(this);
+        bullets.push_back(this);
+    } else {
+        delete this;
     }
-    bullets.push_back(this);
 }
 Bullet::~Bullet() {
+    #if DEBUG
+    debug << "\tDeleting bullet in " << this->getCoordinates().y << ", " << this->getCoordinates().x << std::endl;
+    #endif
+    std::vector<Bullet*>::iterator it = std::find(bullets.begin(), bullets.end(), this);
+    *it = nullptr;
+    #if DEBUG
+    debug << "\tNulling bullet in the vector" << std::endl;
+    #endif
     field->erasePawn(this);
-    bullets.erase(std::find(bullets.begin(), bullets.end(), this));
+    #if DEBUG
+    debug << "\tErasing bullet from the field" << std::endl;
+    #endif
 }
 void Bullet::move() {
     sista::Coordinates coords = this->getCoordinates();
     sista::Coordinates new_coords = coords + directionMap[direction];
-    bool free = field->isFree(new_coords);
     if (field->isOutOfBounds(new_coords)) {
-        field->erasePawn(this);
+        #if DEBUG
+        debug << "\tThe bullet is out of bounds" << std::endl;
+        #endif
+        delete this;
+        #if DEBUG
+        debug << "\tThe bullet was deleted" << std::endl;
+        #endif
         return;
     }
+    #if DEBUG
+    debug << "\tMoving bullet from " << coords.y << ", " << coords.x << " to " << new_coords.y << ", " << new_coords.x << std::endl;
+    #endif
+    bool free = field->isFree(new_coords);
     if (free) {
+        #if DEBUG
+        debug << "\tThe bullet is free to move" << std::endl;
+        #endif
         field->movePawn(this, new_coords);
     } else { // We may have hit something
+        #if DEBUG
+        debug << "\tThe bullet hit something" << std::endl;
+        #endif
         sista::Pawn* pawn = field->getPawn(new_coords);
         if (pawn != nullptr) {
             for (SandWorm* sandWorm : sandWorms) {
                 if (pawn == sandWorm->head) { // If you hit a head...
+                    #if DEBUG
+                    debug << "\tThe bullet hit a sand worm head" << std::endl;
+                    #endif
                     sandWorms.erase(std::find(sandWorms.begin(), sandWorms.end(), sandWorm));
                     sandWorm->erase(); // ...the whole worm is destroyed
                     delete this;
+                    #if DEBUG
+                    debug << "\tThe bullet was deleted" << std::endl;
+                    #endif
                     return;
                 }
                 for (sista::Pawn* body_part : sandWorm->body) { // If you hit a body part...
                     if (pawn == body_part) { // ...only that body part is destroyed
+                        #if DEBUG
+                        debug << "\tThe bullet hit a sand worm body part" << std::endl;
+                        #endif
                         sandWorm->body.erase(std::find(sandWorm->body.begin(), sandWorm->body.end(), body_part));
                         field->erasePawn(body_part);
                         delete this;
+                        #if DEBUG
+                        debug << "\tThe bullet was deleted" << std::endl;
+                        #endif
                         return;
                     }
                 }
             }
         }
+        #if DEBUG
+        debug << "\tThe bullet hit something else" << std::endl;
+        #endif
         delete this;
+        #if DEBUG
+        debug << "\tThe bullet was deleted" << std::endl;
+        #endif
     }
 }
 ANSI::Settings Bullet::bulletStyle = ANSI::Settings(
