@@ -197,8 +197,10 @@ int main() {
                     std::cout << "The sand worms are coming!\n";
                     cursor.set(sista::Coordinates(HEIGHT + 4, WIDTH / 4 - 2));
                     std::cout << "You must be ready to run away! [Q]\n";
+                    #if !BULLETS_ON_ALARM
                     cursor.set(sista::Coordinates(HEIGHT + 5, WIDTH / 4 - 2));
                     std::cout << "Your weapons are now ineffective!\n";
+                    #endif
                     std::this_thread::sleep_for(std::chrono::milliseconds(FRAME));
                     while (true) {
                         counter++;
