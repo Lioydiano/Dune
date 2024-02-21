@@ -7,6 +7,7 @@
 sista::Field* field;
 sista::Border* border;
 std::vector<SandWorm*> sandWorms;
+std::vector<Bullet*> bullets;
 sista::Pawn* miner;
 bool finished = false;
 
@@ -70,8 +71,9 @@ int main() {
     field->addPrintPawn(miner);
 
     // Main loop
-    bool won = false, alarm = false;
-    std::thread th = std::thread([&won]() {
+    bool won = false, alarm = false, bullet = false;
+    Direction bullet_direction = UP;
+    std::thread th = std::thread([&won, &bullet, &bullet_direction]() {
         while (true) {
             #if defined(_WIN32) or defined(__linux__)
                 char input = getch();
@@ -84,6 +86,43 @@ int main() {
             if (finished) {
                 return;
             }
+            if (input == 'i' || input == 'I') {
+                bullet = true;
+                bullet_direction = UP;
+                continue;
+            } else if (input == 'l' || input == 'L') {
+                bullet = true;
+                bullet_direction = RIGHT;
+                continue;
+            } else if (input == 'k' || input == 'K') {
+                bullet = true;
+                bullet_direction = DOWN;
+                continue;
+            } else if (input == 'j' || input == 'J') {
+                bullet = true;
+                bullet_direction = LEFT;
+                continue;
+            }
+            sista::Coordinates coords = miner->getCoordinates();
+            sista::Coordinates new_coords = coords;
+            if (input == 'w' || input == 'W') {
+                new_coords.y--;
+            } else if (input == 'd' || input == 'D') {
+                new_coords.x++;
+            } else if (input == 's' || input == 'S') {
+                new_coords.y++;
+            } else if (input == 'a' || input == 'A') {
+                new_coords.x--;
+            }
+            // Check if the new position is inside the safe area
+            if (
+                new_coords.x >= (WIDTH - INTERNAL_WIDTH) / 2 &&
+                new_coords.x < (WIDTH + INTERNAL_WIDTH) / 2 &&
+                new_coords.y >= (HEIGHT - INTERNAL_HEIGHT) / 2 &&
+                new_coords.y < (HEIGHT + INTERNAL_HEIGHT) / 2
+            ) {
+                field->movePawnFromTo(coords, new_coords);
+            }
         }
         finished = true;
         won = true;
@@ -94,6 +133,21 @@ int main() {
         counter++;
         cursor.set(sista::Coordinates(HEIGHT + 2, WIDTH / 3));
         std::cout << "Melange: " << counter << std::flush;
+        // Check if all worms are dead
+        if (sandWorms.size() == 0) {
+            won = true;
+            finished = true;
+            break;
+        }
+        // Check if a bullet was shot
+        if (bullet) {
+            new Bullet(miner, bullet_direction);
+            bullet = false;
+        }
+        // Move the bullets
+        for (Bullet* bullet : bullets) {
+            bullet->move();
+        }
         // Move the sand worms
         for (SandWorm* sandWorm : sandWorms) {
             sandWorm->move();
@@ -115,7 +169,18 @@ int main() {
                     std::cout << "The sand worms are coming!\n";
                     cursor.set(sista::Coordinates(HEIGHT + 4, WIDTH / 4 - 2));
                     std::cout << "You must be ready to run away! [Q]\n";
+                    cursor.set(sista::Coordinates(HEIGHT + 5, WIDTH / 4 - 2));
+                    std::cout << "Your weapons are now ineffective!\n";
                     while (true) {
+                        counter++;
+                        cursor.set(sista::Coordinates(HEIGHT + 2, WIDTH / 3));
+                        std::cout << "Melange: " << counter << std::flush;
+                        // Check if all worms are dead
+                        if (sandWorms.size() == 0) {
+                            won = true;
+                            finished = true;
+                            break;
+                        }
                         // Move the sand worms
                         for (SandWorm* sandWorm : sandWorms) {
                             sandWorm->move();
@@ -197,12 +262,7 @@ SandWorm::SandWorm() {
 SandWorm::SandWorm(sista::Pawn* head) {
     this->head = head;
 }
-SandWorm::~SandWorm() {
-    delete head;
-    for (sista::Pawn* pawn : body) {
-        delete pawn;
-    }
-}
+SandWorm::~SandWorm() {}
 void SandWorm::move() {
     // Check a random direction until it finds a valid one
     sista::Coordinates old_head_coords = head->getCoordinates();
@@ -277,6 +337,14 @@ void SandWorm::move() {
         body.erase(body.begin());
     }
 }
+void SandWorm::erase() {
+    field->erasePawn(head);
+    delete head;
+    for (sista::Pawn* pawn : body) {
+        field->erasePawn(pawn);
+        delete pawn;
+    }
+}
 ANSI::Settings SandWorm::sandWormBodyStyle = ANSI::Settings(
     ANSI::ForegroundColor::F_GREEN,
     ANSI::BackgroundColor::B_BLACK,
@@ -286,4 +354,85 @@ ANSI::Settings SandWorm::sandWormHeadStyle = ANSI::Settings(
     ANSI::ForegroundColor::F_GREEN,
     ANSI::BackgroundColor::B_BLACK,
     ANSI::Attribute::RAPID_BLINK
+);
+
+
+std::unordered_map<Direction, sista::Coordinates> directionMap = {
+    {UP, sista::Coordinates(-1, 0)},
+    {RIGHT, sista::Coordinates(0, 1)},
+    {DOWN, sista::Coordinates(1, 0)},
+    {LEFT, sista::Coordinates(0, -1)}
+};
+std::unordered_map<Direction, char> directionSymbol = {
+    {UP, '^'}, {RIGHT, '>'}, {DOWN, 'v'}, {LEFT, '<'}
+};
+
+
+Bullet::Bullet(sista::Pawn* shooter, Direction direction_) : sista::Pawn('^', sista::Coordinates(0, 0), bulletStyle), direction(direction_) {
+    sista::Coordinates coords = shooter->getCoordinates();
+    switch (direction) {
+        case UP:
+            coords.y--;
+            break;
+        case RIGHT:
+            coords.x++;
+            break;
+        case DOWN:
+            coords.y++;
+            break;
+        case LEFT:
+            coords.x--;
+            break;
+    }
+    this->setCoordinates(coords);
+    this->settings = bulletStyle;
+    this->symbol = directionSymbol[direction];
+    bool free = field->isFree(coords);
+    if (free) {
+        field->addPrintPawn(this);
+    }
+    bullets.push_back(this);
+}
+Bullet::~Bullet() {
+    field->erasePawn(this);
+    bullets.erase(std::find(bullets.begin(), bullets.end(), this));
+}
+void Bullet::move() {
+    sista::Coordinates coords = this->getCoordinates();
+    sista::Coordinates new_coords = coords + directionMap[direction];
+    bool free = field->isFree(new_coords);
+    if (field->isOutOfBounds(new_coords)) {
+        field->erasePawn(this);
+        delete this;
+        return;
+    }
+    if (free) {
+        field->movePawn(this, new_coords);
+    } else { // We may have hit something
+        sista::Pawn* pawn = field->getPawn(new_coords);
+        if (pawn != nullptr) {
+            for (SandWorm* sandWorm : sandWorms) {
+                if (pawn == sandWorm->head) { // If you hit a head...
+                    sandWorms.erase(std::find(sandWorms.begin(), sandWorms.end(), sandWorm));
+                    sandWorm->erase(); // ...the whole worm is destroyed
+                    delete this;
+                    return;
+                }
+                for (sista::Pawn* body_part : sandWorm->body) { // If you hit a body part...
+                    if (pawn == body_part) { // ...only that body part is destroyed
+                        sandWorm->body.erase(std::find(sandWorm->body.begin(), sandWorm->body.end(), body_part));
+                        field->erasePawn(body_part);
+                        delete this;
+                        return;
+                    }
+                }
+            }
+        }
+        delete this;
+    }
+}
+ANSI::Settings Bullet::bulletStyle = ANSI::Settings(
+    ANSI::ForegroundColor::F_RED,
+    ANSI::BackgroundColor::B_BLACK,
+    ANSI::Attribute::BRIGHT
 );
