@@ -367,8 +367,8 @@ void SandWorm::move() {
                 if (pawn != nullptr && rand() % 2 == 0) {
                     body.erase(std::find(body.begin(), body.end(), pawn));
                     field->erasePawn(pawn);
+                    break;
                 }
-                // delete pawn;
             }
             trials = 7;
         }
@@ -381,21 +381,7 @@ void SandWorm::move() {
     // Move the head
     field->movePawn(head, new_head_coords);
     // Move the body [no need to move the whole tail, just add a P2 to the head's old position]
-    char symbol;
-    switch (direction) {
-        case 0: // Up
-            symbol = '^';
-            break;
-        case 1: // Right
-            symbol = '>';
-            break;
-        case 2: // Down
-            symbol = 'v';
-            break;
-        case 3: // Left
-            symbol = '<';
-            break;
-    }
+    char symbol = directionSymbol[static_cast<Direction>(direction)];
     body.push_back(new sista::Pawn(symbol, old_head_coords, sandWormBodyStyle));
     field->addPrintPawn(body.back());
     // Consider that the body has a maximum size
