@@ -19,6 +19,7 @@
 #define COOLDOWN 10 // The cooldown of the controls [ms]
 // Dev
 #define DEBUG 0 // Debug mode
+#define INTRO 1 // Show the intro
 
 class SandWorm {
 public:

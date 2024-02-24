@@ -15,6 +15,17 @@ std::vector<Bullet*> bullets;
 sista::Pawn* miner;
 bool finished = false;
 
+void printIntro();
+ANSI::Settings minerSettings(
+    ANSI::ForegroundColor::F_YELLOW,
+    ANSI::BackgroundColor::B_BLACK,
+    ANSI::Attribute::BRIGHT
+);
+ANSI::Settings safeAreaStyle(
+    ANSI::ForegroundColor::F_BLACK,
+    ANSI::BackgroundColor::B_YELLOW,
+    ANSI::Attribute::BRIGHT
+);
 
 int main() {
     #ifdef __APPLE__
@@ -23,6 +34,9 @@ int main() {
     std::ios_base::sync_with_stdio(false);
     ANSI::reset(); // Reset the settings
     srand(time(NULL)); // Seed the random number generator
+    #if INTRO
+        printIntro();
+    #endif
 
     // Initialize the sista stuff
     sista::Field field_(WIDTH, HEIGHT);
@@ -42,11 +56,6 @@ int main() {
     }
     // Initialize the safe area
     sista::Cursor cursor;
-    ANSI::Settings safeAreaStyle(
-        ANSI::ForegroundColor::F_BLACK,
-        ANSI::BackgroundColor::B_YELLOW,
-        ANSI::Attribute::BRIGHT
-    );
     sista::Coordinates safeAreaPoint(
         (HEIGHT - INTERNAL_HEIGHT) / 2,
         (WIDTH - INTERNAL_WIDTH) / 2
@@ -66,11 +75,7 @@ int main() {
     // Initialize the miner
     miner = new sista::Pawn(
         'M', sista::Coordinates(HEIGHT / 2, WIDTH / 2),
-        ANSI::Settings(
-            ANSI::ForegroundColor::F_YELLOW,
-            ANSI::BackgroundColor::B_BLACK,
-            ANSI::Attribute::BRIGHT
-        )
+        minerSettings
     );
     field->addPrintPawn(miner);
 
@@ -534,3 +539,33 @@ ANSI::Settings Bullet::bulletStyle = ANSI::Settings(
     ANSI::BackgroundColor::B_BLACK,
     ANSI::Attribute::BRIGHT
 );
+
+
+void printIntro() {
+    sista::clearScreen();
+    ANSI::reset();
+    std::cout << "You are a ";
+    minerSettings.apply();
+    std::cout << "M";
+    ANSI::reset();
+    std::cout << "iner in the desert planet of \x1b[3mArrakis\x1b[23m, and you are extracting \x1b[3mmelange\x1b[23m.\n" << std::endl;
+    std::cout << "There is a ";
+    safeAreaStyle.apply();
+    std::cout << "safe area";
+    ANSI::reset();
+    std::cout << ", the mine, from which you can't escape, and a dangerous area, the desert, where the ";
+    SandWorm::sandWormBodyStyle.apply();
+    std::cout << "sand worms";
+    ANSI::reset();
+    std::cout << " are.\n" << std::endl;
+    std::cout << "Unfortunately, the sand worms are coming for you, and you have to defend yourself!\n" << std::endl;
+    std::cout << "Don't worry, there's a \"plane\" that can make you escape if you want, but leaving the mine will make you stop extracting \x1b[3mmelange\x1b[23m and thus scoring less points.\n\n" << std::endl;
+    std::cout << "You can shoot bullets with the keys [\x1b[35mI\x1b[37;40m], [\x1b[35mL\x1b[37;40m], [\x1b[35mK\x1b[37;40m], [\x1b[35mJ\x1b[37;40m] and move with the keys [\x1b[35mW\x1b[37;40m], [\x1b[35mD\x1b[37;40m], [\x1b[35mS\x1b[37;40m], [\x1b[35mA\x1b[37;40m].\n" << std::endl;
+    std::cout << "You can escape with the plane using the key [\x1b[35mQ\x1b[37;40m].\n" << std::endl;
+    std::cout << "Press [\x1b[35mEnter\x1b[37;40m] to start the game." << std::flush;
+    #if defined(_WIN32) or defined(__linux__)
+        getch();
+    #elif __APPLE__
+        getchar();
+    #endif
+}
